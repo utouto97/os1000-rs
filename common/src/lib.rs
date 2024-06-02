@@ -92,3 +92,8 @@ macro_rules! write_csr {
         }
     };
 }
+
+pub type PAddr = u32;
+pub type VAddr = u32;
+
+pub const PAGE_SIZE: usize = 4096;

@@ -2,10 +2,13 @@
 #![no_main]
 #![feature(naked_functions)]
 
+mod memory;
 mod sbi;
 
 use common::{println, read_csr, write_csr, TrapFrame};
 use core::{arch::asm, panic::PanicInfo, ptr};
+
+use crate::memory::alloc_pages;
 
 extern "C" {
     static mut __bss: u32;
@@ -22,7 +25,15 @@ fn kernel_main() {
     }
 
     write_csr!("stvec", kernel_entry);
-    unsafe { asm!("unimp") }
+
+    let paddr0 = alloc_pages(2);
+    let paddr1 = alloc_pages(1);
+    let paddr2 = alloc_pages(3);
+    let paddr3 = alloc_pages(4);
+    println!("alloc_pages test: paddr0={paddr0:x}");
+    println!("alloc_pages test: paddr1={paddr1:x}");
+    println!("alloc_pages test: paddr2={paddr2:x}");
+    println!("alloc_pages test: paddr3={paddr3:x}");
 
     let s = "Hello world!";
     println!("{} {}", s, s);
