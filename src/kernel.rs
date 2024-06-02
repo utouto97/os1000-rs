@@ -3,18 +3,22 @@
 #![feature(naked_functions)]
 
 mod memory;
+mod process;
 mod sbi;
 
 use common::{println, read_csr, write_csr, TrapFrame};
 use core::{arch::asm, panic::PanicInfo, ptr};
+use process::ProcessManager;
 
-use crate::memory::alloc_pages;
+use crate::sbi::putchar;
 
 extern "C" {
     static mut __bss: u32;
     static __bss_end: u32;
     static __stack_top: u32;
 }
+
+static mut PM: ProcessManager = ProcessManager::new();
 
 #[no_mangle]
 fn kernel_main() {
@@ -26,19 +30,38 @@ fn kernel_main() {
 
     write_csr!("stvec", kernel_entry);
 
-    let paddr0 = alloc_pages(2);
-    let paddr1 = alloc_pages(1);
-    let paddr2 = alloc_pages(3);
-    let paddr3 = alloc_pages(4);
-    println!("alloc_pages test: paddr0={paddr0:x}");
-    println!("alloc_pages test: paddr1={paddr1:x}");
-    println!("alloc_pages test: paddr2={paddr2:x}");
-    println!("alloc_pages test: paddr3={paddr3:x}");
-
-    let s = "Hello world!";
-    println!("{} {}", s, s);
+    unsafe {
+        PM.init();
+        PM.create(proc_a_entry as u32);
+        PM.create(proc_b_entry as u32);
+        PM.yield_();
+    }
 
     loop {}
+}
+
+fn proc_a_entry() {
+    println!("starting process A");
+    loop {
+        putchar(b'A');
+        unsafe { PM.yield_() }
+
+        for _ in 0..3000000 {
+            unsafe { asm!("nop") }
+        }
+    }
+}
+
+fn proc_b_entry() {
+    println!("starting process B");
+    loop {
+        putchar(b'B');
+        unsafe { PM.yield_() }
+
+        for _ in 0..3000000 {
+            unsafe { asm!("nop") }
+        }
+    }
 }
 
 #[link_section = ".text.boot"]
@@ -66,7 +89,7 @@ fn panic(info: &PanicInfo) -> ! {
 extern "C" fn kernel_entry() {
     unsafe {
         asm!(
-            "csrw sscratch, sp",
+            "csrrw sp, sscratch, sp",
             "addi sp, sp, -4 * 31",
             "sw ra,  4 * 0(sp)",
             "sw gp,  4 * 1(sp)",
@@ -100,7 +123,8 @@ extern "C" fn kernel_entry() {
             "sw s11, 4 * 29(sp)",
             "csrr a0, sscratch",
             "sw a0, 4 * 30(sp)",
-            "mv a0, sp",
+            "addi a0, sp, 4*31",
+            "csrw sscratch, a0",
             "call handle_trap",
             "lw ra,  4 * 0(sp)",
             "lw gp,  4 * 1(sp)",
