@@ -30,7 +30,7 @@ pub fn alloc_pages(n: usize) -> PAddr {
     }
 }
 
-pub fn map_page(table1: *mut u32, vaddr: VAddr, paddr: PAddr, flags: u32) {
+pub fn map_page(table1: u32, vaddr: VAddr, paddr: PAddr, flags: u32) {
     if !is_aligned(vaddr as usize, PAGE_SIZE) {
         panic!("unaligned vaddr {vaddr}");
     }

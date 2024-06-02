@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(naked_functions)]
+#![feature(asm_const)]
 
 mod memory;
 mod process;
@@ -10,12 +11,12 @@ use common::{println, read_csr, write_csr, TrapFrame};
 use core::{arch::asm, panic::PanicInfo, ptr};
 use process::ProcessManager;
 
-use crate::sbi::putchar;
-
 extern "C" {
     static mut __bss: u32;
     static __bss_end: u32;
     static __stack_top: u32;
+    static _binary_shell_bin_start: u32;
+    static _binary_shell_bin_size: u32;
 }
 
 static mut PM: ProcessManager = ProcessManager::new();
@@ -31,37 +32,15 @@ fn kernel_main() {
     write_csr!("stvec", kernel_entry);
 
     unsafe {
+        let start = ptr::addr_of!(_binary_shell_bin_start);
+        let size = ptr::addr_of!(_binary_shell_bin_size) as usize;
+
         PM.init();
-        PM.create(proc_a_entry as u32);
-        PM.create(proc_b_entry as u32);
+        PM.create(start, size);
         PM.yield_();
     }
 
     loop {}
-}
-
-fn proc_a_entry() {
-    println!("starting process A");
-    loop {
-        putchar(b'A');
-        unsafe { PM.yield_() }
-
-        for _ in 0..3000000 {
-            unsafe { asm!("nop") }
-        }
-    }
-}
-
-fn proc_b_entry() {
-    println!("starting process B");
-    loop {
-        putchar(b'B');
-        unsafe { PM.yield_() }
-
-        for _ in 0..3000000 {
-            unsafe { asm!("nop") }
-        }
-    }
 }
 
 #[link_section = ".text.boot"]

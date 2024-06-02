@@ -2,7 +2,7 @@ use core::{arch::asm, ptr};
 
 use common::{PAddr, VAddr, PAGE_SIZE};
 
-use crate::memory::{alloc_pages, map_page, PAGE_R, PAGE_W, PAGE_X, SATP_SV32};
+use crate::memory::{alloc_pages, map_page, PAGE_R, PAGE_U, PAGE_W, PAGE_X, SATP_SV32};
 
 extern "C" {
     static mut __kernel_base: u32;
@@ -10,6 +10,24 @@ extern "C" {
 }
 
 const PROCS_MAX: usize = 8;
+const SSTATUS_SPIE: usize = 1 << 5;
+const USER_BASE: usize = 0x01000000;
+
+#[naked]
+extern "C" fn user_entry() {
+    unsafe {
+        asm!(
+            "la a0, {sepc}",
+            "csrw sepc, a0",
+            "la a0, {sstatus}",
+            "csrw sstatus, a0",
+            "sret",
+            sepc = const USER_BASE,
+            sstatus = const SSTATUS_SPIE,
+            options(noreturn)
+        );
+    }
+}
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 enum State {
@@ -78,7 +96,7 @@ impl ProcessManager {
             let mut paddr = ptr::addr_of_mut!(__kernel_base) as *mut u8;
             while paddr < ptr::addr_of_mut!(__free_ram_end) as *mut u8 {
                 map_page(
-                    page_table as *mut u32,
+                    page_table,
                     paddr as u32,
                     paddr as u32,
                     PAGE_R | PAGE_W | PAGE_X,
@@ -93,7 +111,7 @@ impl ProcessManager {
         }
     }
 
-    pub fn create(&mut self, pc: u32) {
+    pub fn create(&mut self, image: *const u32, image_size: usize) {
         unsafe {
             if let Some((i, proc)) = self
                 .procs
@@ -115,18 +133,32 @@ impl ProcessManager {
                 *sp.offset(-10) = 0; // s2
                 *sp.offset(-11) = 0; // s1
                 *sp.offset(-12) = 0; // s0
-                *sp.offset(-13) = pc as u32; // ra
+                *sp.offset(-13) = user_entry as u32; // ra
 
                 let page_table = alloc_pages(1);
                 let mut paddr = ptr::addr_of_mut!(__kernel_base) as *mut u8;
                 while paddr < ptr::addr_of_mut!(__free_ram_end) as *mut u8 {
                     map_page(
-                        page_table as *mut u32,
+                        page_table,
                         paddr as u32,
                         paddr as u32,
                         PAGE_R | PAGE_W | PAGE_X,
                     );
                     paddr = paddr.add(PAGE_SIZE as usize);
+                }
+
+                let mut off = 0;
+                let pimage = image;
+                while off < image_size {
+                    let page = alloc_pages(1) as *mut u32;
+                    ptr::copy(pimage.offset(off as isize), page, PAGE_SIZE as usize);
+                    map_page(
+                        page_table,
+                        (USER_BASE + off) as u32,
+                        page as u32,
+                        PAGE_U | PAGE_R | PAGE_W | PAGE_X,
+                    );
+                    off += PAGE_SIZE as usize;
                 }
 
                 proc.pid = i as u32;
