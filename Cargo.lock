@@ -3,5 +3,12 @@
 version = 3
 
 [[package]]
+name = "common"
+version = "0.1.0"
+
+[[package]]
 name = "os1000-rs"
 version = "0.1.0"
+dependencies = [
+ "common",
+]

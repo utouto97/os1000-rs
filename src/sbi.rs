@@ -29,6 +29,7 @@ unsafe fn sbi_call(
     }
 }
 
+#[no_mangle]
 pub fn putchar(ch: u8) {
     unsafe {
         sbi_call(ch as i32, 0, 0, 0, 0, 0, 0, 1);

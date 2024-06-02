@@ -4,7 +4,7 @@
 
 mod sbi;
 
-use crate::sbi::putchar;
+use common::println;
 use core::{arch::asm, panic::PanicInfo, ptr};
 
 extern "C" {
@@ -21,10 +21,8 @@ fn kernel_main() {
         ptr::write_bytes(bss, 0, bss_end as usize - bss as usize);
     }
 
-    let s = "Hello world!\n";
-    for c in s.as_bytes() {
-        putchar(*c);
-    }
+    let s = "Hello world!";
+    println!("{} {}", s, s);
 
     loop {}
 }
