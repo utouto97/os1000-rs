@@ -1,6 +1,13 @@
 use core::{arch::asm, ptr};
 
-use common::VAddr;
+use common::{PAddr, VAddr, PAGE_SIZE};
+
+use crate::memory::{alloc_pages, map_page, PAGE_R, PAGE_W, PAGE_X, SATP_SV32};
+
+extern "C" {
+    static mut __kernel_base: u32;
+    static mut __free_ram_end: u32;
+}
 
 const PROCS_MAX: usize = 8;
 
@@ -16,6 +23,7 @@ struct Process {
     pid: u32,
     state: State,
     sp: VAddr,
+    page_table: PAddr,
     stack: [u8; 8192],
 }
 
@@ -25,6 +33,7 @@ impl Process {
             pid: 0,
             state: State::UNUSED,
             sp: 0,
+            page_table: 0,
             stack: [0; 8192],
         }
     }
@@ -64,10 +73,23 @@ impl ProcessManager {
             *sp.offset(-11) = 0; // s1
             *sp.offset(-12) = 0; // s0
             *sp.offset(-13) = 0; // ra
+                                 //
+            let page_table = alloc_pages(1);
+            let mut paddr = ptr::addr_of_mut!(__kernel_base) as *mut u8;
+            while paddr < ptr::addr_of_mut!(__free_ram_end) as *mut u8 {
+                map_page(
+                    page_table as *mut u32,
+                    paddr as u32,
+                    paddr as u32,
+                    PAGE_R | PAGE_W | PAGE_X,
+                );
+                paddr = paddr.add(PAGE_SIZE as usize);
+            }
 
             proc.pid = u32::MAX as u32;
             proc.state = State::IDLE;
             proc.sp = sp.offset(-13) as VAddr;
+            proc.page_table = page_table;
         }
     }
 
@@ -95,9 +117,22 @@ impl ProcessManager {
                 *sp.offset(-12) = 0; // s0
                 *sp.offset(-13) = pc as u32; // ra
 
+                let page_table = alloc_pages(1);
+                let mut paddr = ptr::addr_of_mut!(__kernel_base) as *mut u8;
+                while paddr < ptr::addr_of_mut!(__free_ram_end) as *mut u8 {
+                    map_page(
+                        page_table as *mut u32,
+                        paddr as u32,
+                        paddr as u32,
+                        PAGE_R | PAGE_W | PAGE_X,
+                    );
+                    paddr = paddr.add(PAGE_SIZE as usize);
+                }
+
                 proc.pid = i as u32;
                 proc.state = State::RUNNABLE;
                 proc.sp = sp.offset(-13) as VAddr;
+                proc.page_table = page_table;
             } else {
                 panic!("no free process slots");
             }
@@ -123,7 +158,14 @@ impl ProcessManager {
             let next_proc = &mut self.procs[next];
             let next_stack = ptr::addr_of_mut!(next_proc.stack) as *mut u32;
             let next_stack_top = next_stack.add(next_proc.stack.len());
-            asm!("csrw sscratch, {0}", in(reg) next_stack_top);
+            asm!(
+                "sfence.vma",
+                "csrw satp, {satp}",
+                "sfence.vma",
+                "csrw sscratch, {sscratch}",
+                satp = in(reg) SATP_SV32 | (next_proc.page_table / PAGE_SIZE as u32),
+                sscratch = in(reg) next_stack_top,
+            );
         }
 
         let prev = self.current;

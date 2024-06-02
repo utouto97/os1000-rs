@@ -97,3 +97,16 @@ pub type PAddr = u32;
 pub type VAddr = u32;
 
 pub const PAGE_SIZE: usize = 4096;
+
+pub const fn align_up(value: usize, align: usize) -> usize {
+    let r = value % align;
+    if r == 0 {
+        value
+    } else {
+        value + (align - r)
+    }
+}
+
+pub const fn is_aligned(value: usize, align: usize) -> bool {
+    value % align == 0
+}
