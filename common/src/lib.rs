@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
+use core::{arch::asm, fmt::Write, panic::PanicInfo};
 
 extern "C" {
     fn putchar(ch: u8);

@@ -2,3 +2,6 @@
 
 kernel.map
 qemu.log
+
+shell.bin
+shell.bin.o
