@@ -2,6 +2,9 @@
 #![no_main]
 #![feature(naked_functions)]
 
+mod sbi;
+
+use crate::sbi::putchar;
 use core::{arch::asm, panic::PanicInfo, ptr};
 
 extern "C" {
@@ -16,6 +19,11 @@ fn kernel_main() {
         let bss = ptr::addr_of_mut!(__bss);
         let bss_end = ptr::addr_of!(__bss_end);
         ptr::write_bytes(bss, 0, bss_end as usize - bss as usize);
+    }
+
+    let s = "Hello world!\n";
+    for c in s.as_bytes() {
+        putchar(*c);
     }
 
     loop {}
