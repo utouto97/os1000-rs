@@ -23,6 +23,7 @@ fn kernel_main() {
 
     let s = "Hello world!";
     println!("{} {}", s, s);
+    panic!("kernel panic");
 
     loop {}
 }
@@ -42,6 +43,7 @@ extern "C" fn boot() {
 }
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn panic(info: &PanicInfo) -> ! {
+    println!("PANIC: {info}");
     loop {}
 }
