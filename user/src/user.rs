@@ -4,6 +4,7 @@
 
 mod shell;
 
+use common::SYS_PUTCHAR;
 use core::{arch::asm, panic::PanicInfo};
 
 extern "C" {
@@ -31,6 +32,28 @@ fn exit() {
 }
 
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+fn panic(_info: &PanicInfo) -> ! {
     loop {}
+}
+
+unsafe fn syscall(sysno: u32, arg0: u32, arg1: u32, arg2: u32) -> u32 {
+    let mut result: u32;
+
+    asm!(
+        "ecall",
+        in("a0") arg0,
+        in("a1") arg1,
+        in("a2") arg2,
+        in("a3") sysno,
+        lateout("a0") result,
+    );
+
+    result
+}
+
+#[no_mangle]
+fn putchar(ch: u8) {
+    unsafe {
+        syscall(SYS_PUTCHAR, ch as u32, 0, 0);
+    }
 }

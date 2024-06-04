@@ -1,8 +1,10 @@
+use crate::putchar;
+
 #[no_mangle]
 fn main() {
-    unsafe {
-        let addr = 0x80200000 as *mut u32;
-        *addr = 0x1234;
+    let msg = "hello";
+    for c in msg.bytes() {
+        putchar(c);
     }
 
     loop {}

@@ -7,9 +7,10 @@ mod memory;
 mod process;
 mod sbi;
 
-use common::{println, read_csr, write_csr, TrapFrame};
+use common::{println, read_csr, write_csr, TrapFrame, SYS_PUTCHAR};
 use core::{arch::asm, panic::PanicInfo, ptr};
 use process::ProcessManager;
+use sbi::putchar;
 
 extern "C" {
     static mut __bss: u32;
@@ -18,6 +19,8 @@ extern "C" {
     static _binary_shell_bin_start: u32;
     static _binary_shell_bin_size: u32;
 }
+
+const SCAUSE_ECALL: u32 = 8;
 
 static mut PM: ProcessManager = ProcessManager::new();
 
@@ -104,6 +107,7 @@ extern "C" fn kernel_entry() {
             "sw a0, 4 * 30(sp)",
             "addi a0, sp, 4*31",
             "csrw sscratch, a0",
+            "mv a0, sp",
             "call handle_trap",
             "lw ra,  4 * 0(sp)",
             "lw gp,  4 * 1(sp)",
@@ -143,10 +147,25 @@ extern "C" fn kernel_entry() {
 }
 
 #[no_mangle]
-fn handle_trap(_f: *mut TrapFrame) {
+fn handle_trap(f: *mut TrapFrame) {
     let scause = read_csr!("scause");
     let stval = read_csr!("stval");
-    let user_pc = read_csr!("sepc");
+    let mut user_pc = read_csr!("sepc");
 
-    panic!("unexpected trap scause={scause:x}, stval={stval:x}, sepc={user_pc:x}");
+    if scause == SCAUSE_ECALL {
+        handle_syscall(f);
+        user_pc += 4;
+    } else {
+        panic!("unexpected trap scause={scause:x}, stval={stval:x}, sepc={user_pc:x}");
+    }
+
+    write_csr!("sepc", user_pc);
+}
+
+fn handle_syscall(f: *mut TrapFrame) {
+    let f = unsafe { f.as_ref().unwrap() };
+    match f.a3 {
+        SYS_PUTCHAR => putchar(f.a0 as u8),
+        _ => panic!("unexpected syscall a3={:x}", f.a3 as u32),
+    }
 }

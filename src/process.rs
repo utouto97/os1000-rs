@@ -1,6 +1,6 @@
 use core::{arch::asm, ptr};
 
-use common::{PAddr, VAddr, PAGE_SIZE};
+use common::{println, PAddr, VAddr, PAGE_SIZE};
 
 use crate::memory::{alloc_pages, map_page, PAGE_R, PAGE_U, PAGE_W, PAGE_X, SATP_SV32};
 

@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use core::{arch::asm, fmt::Write, panic::PanicInfo};
+use core::fmt::Write;
 
 extern "C" {
     fn putchar(ch: u8);
@@ -37,6 +37,7 @@ macro_rules! println {
 }
 
 #[repr(C, packed)]
+#[derive(Debug)]
 pub struct TrapFrame {
     pub ra: u32,
     pub gp: u32,
@@ -110,3 +111,5 @@ pub const fn align_up(value: usize, align: usize) -> usize {
 pub const fn is_aligned(value: usize, align: usize) -> bool {
     value % align == 0
 }
+
+pub const SYS_PUTCHAR: u32 = 1;
