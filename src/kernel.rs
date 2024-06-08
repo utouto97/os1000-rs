@@ -7,10 +7,10 @@ mod memory;
 mod process;
 mod sbi;
 
-use common::{println, read_csr, write_csr, TrapFrame, SYS_PUTCHAR};
+use common::{println, read_csr, write_csr, TrapFrame, SYS_EXIT, SYS_GETCHAR, SYS_PUTCHAR};
 use core::{arch::asm, panic::PanicInfo, ptr};
 use process::ProcessManager;
-use sbi::putchar;
+use sbi::{getchar, putchar};
 
 extern "C" {
     static mut __bss: u32;
@@ -42,6 +42,8 @@ fn kernel_main() {
         PM.create(start, size);
         PM.yield_();
     }
+
+    println!("switched to idle process");
 
     loop {}
 }
@@ -163,9 +165,21 @@ fn handle_trap(f: *mut TrapFrame) {
 }
 
 fn handle_syscall(f: *mut TrapFrame) {
-    let f = unsafe { f.as_ref().unwrap() };
+    let f = unsafe { f.as_mut().unwrap() };
     match f.a3 {
         SYS_PUTCHAR => putchar(f.a0 as u8),
+        SYS_GETCHAR => loop {
+            let ch = getchar();
+            if ch >= 0 {
+                f.a0 = ch as u32;
+                break;
+            }
+
+            unsafe { PM.yield_() };
+        },
+        SYS_EXIT => {
+            unsafe { PM.exit() };
+        }
         _ => panic!("unexpected syscall a3={:x}", f.a3 as u32),
     }
 }

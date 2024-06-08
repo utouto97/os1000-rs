@@ -113,3 +113,5 @@ pub const fn is_aligned(value: usize, align: usize) -> bool {
 }
 
 pub const SYS_PUTCHAR: u32 = 1;
+pub const SYS_GETCHAR: u32 = 2;
+pub const SYS_EXIT: u32 = 3;

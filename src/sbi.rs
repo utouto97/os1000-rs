@@ -35,3 +35,11 @@ pub fn putchar(ch: u8) {
         sbi_call(ch as i32, 0, 0, 0, 0, 0, 0, 1);
     }
 }
+
+#[no_mangle]
+pub fn getchar() -> i32 {
+    unsafe {
+        let ret = sbi_call(0, 0, 0, 0, 0, 0, 0, 2);
+        return ret._error;
+    }
+}

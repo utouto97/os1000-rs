@@ -34,6 +34,7 @@ enum State {
     UNUSED,
     RUNNABLE,
     IDLE,
+    EXITED,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -59,7 +60,7 @@ impl Process {
 
 pub struct ProcessManager {
     procs: [Process; PROCS_MAX],
-    current: usize,
+    pub current: usize,
 }
 
 impl ProcessManager {
@@ -203,6 +204,12 @@ impl ProcessManager {
         let prev = self.current;
         self.current = next;
         switch_context(&mut self.procs[prev].sp, &self.procs[next].sp);
+    }
+
+    pub fn exit(&mut self) {
+        println!("process {} exited", self.current);
+        self.procs[self.current].state = State::EXITED;
+        self.yield_();
     }
 }
 
