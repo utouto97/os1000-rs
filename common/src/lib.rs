@@ -115,3 +115,5 @@ pub const fn is_aligned(value: usize, align: usize) -> bool {
 pub const SYS_PUTCHAR: u32 = 1;
 pub const SYS_GETCHAR: u32 = 2;
 pub const SYS_EXIT: u32 = 3;
+
+pub const VIRTIO_BLK_PADDR: usize = 0x10001000;

@@ -1,6 +1,6 @@
 use core::{arch::asm, ptr};
 
-use common::{println, PAddr, VAddr, PAGE_SIZE};
+use common::{println, PAddr, VAddr, PAGE_SIZE, VIRTIO_BLK_PADDR};
 
 use crate::memory::{alloc_pages, map_page, PAGE_R, PAGE_U, PAGE_W, PAGE_X, SATP_SV32};
 
@@ -147,6 +147,13 @@ impl ProcessManager {
                     );
                     paddr = paddr.add(PAGE_SIZE as usize);
                 }
+
+                map_page(
+                    page_table,
+                    VIRTIO_BLK_PADDR as u32,
+                    VIRTIO_BLK_PADDR as u32,
+                    PAGE_R | PAGE_W,
+                );
 
                 let mut off = 0;
                 let pimage = image;
