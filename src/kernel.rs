@@ -11,9 +11,10 @@ mod virtio;
 
 use common::{
     ascii_len, println, read_csr, write_csr, TrapFrame, SYS_EXIT, SYS_GETCHAR, SYS_PUTCHAR,
-    SYS_READFILE,
+    SYS_READFILE, SYS_WRITEFILE,
 };
 use core::{arch::asm, panic::PanicInfo, ptr};
+use fs::fs_flush;
 use process::ProcessManager;
 use sbi::{getchar, putchar};
 
@@ -33,6 +34,7 @@ extern "C" {
 const SCAUSE_ECALL: u32 = 8;
 
 static mut PM: ProcessManager = ProcessManager::new();
+static mut VIRTIO: *mut Virtio = core::ptr::null_mut();
 
 #[no_mangle]
 fn kernel_main() {
@@ -46,6 +48,9 @@ fn kernel_main() {
 
     // let mut buf: [u8; Virtio::SECTOR_SIZE as usize] = [0; Virtio::SECTOR_SIZE as usize];
     let mut virtio = Virtio::new();
+    unsafe {
+        VIRTIO = core::ptr::addr_of_mut!(virtio) as *mut Virtio;
+    }
     // virtio.read_write_disk(&mut buf, 0, false);
     // let s = core::str::from_utf8(&buf).unwrap();
     // println!("lorem.txt {:?}", s);
@@ -228,6 +233,38 @@ fn handle_syscall(f: *mut TrapFrame) {
             }
 
             unsafe { ptr::copy(file.data.as_ptr(), buf as *mut _, len) };
+            f.a0 = len as u32;
+        }
+        SYS_WRITEFILE => {
+            let filename = f.a0 as *const u8;
+            let filename_len = ascii_len(filename);
+            let filename = unsafe {
+                core::str::from_utf8(core::slice::from_raw_parts(filename, filename_len - 1))
+                    .unwrap()
+            };
+
+            let buf = f.a1 as *const u8;
+            let mut len = f.a2 as usize;
+
+            let file = if let Ok(f) = fs_lookup(filename) {
+                unsafe { f.as_mut().unwrap() }
+            } else {
+                println!("file not found: {}", filename);
+                f.a0 = 0xffff_fffe as u32;
+                return;
+            };
+
+            if len > file.size {
+                len = file.size;
+            }
+
+            unsafe { ptr::copy(buf as *mut _, file.data.as_mut_ptr(), len) };
+            file.size = len;
+            unsafe {
+                let virtio = VIRTIO.as_mut().unwrap();
+                fs_flush(virtio);
+            }
+            f.a0 = len as u32;
         }
         _ => panic!("unexpected syscall a3={:x}", f.a3 as u32),
     }

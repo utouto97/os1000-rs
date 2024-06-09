@@ -51,6 +51,7 @@ const DISK_MAX_SIZE: usize = align_up(
 
 static mut FILES: [File; FILES_MAX] = [File::new(); FILES_MAX];
 static mut DISK: [u8; DISK_MAX_SIZE] = [0; DISK_MAX_SIZE];
+static mut VIRTIO: *mut Virtio = core::ptr::null_mut();
 
 pub unsafe fn fs_init(virtio: &mut Virtio) {
     let mut sector = 0;

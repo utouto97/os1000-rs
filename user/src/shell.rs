@@ -1,4 +1,4 @@
-use crate::{exit, getchar, putchar, readfile};
+use crate::{exit, getchar, putchar, readfile, writefile};
 
 #[no_mangle]
 fn main() {
@@ -37,6 +37,8 @@ fn main() {
                         }
                         Err(_) => print("error"),
                     }
+                } else if s == "writefile" {
+                    writefile("./lorem.txt\0", b"Hello from virtio\n\0", 128);
                 } else {
                     print("command not found\n");
                 }

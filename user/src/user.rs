@@ -4,7 +4,7 @@
 
 mod shell;
 
-use common::{SYS_EXIT, SYS_GETCHAR, SYS_PUTCHAR, SYS_READFILE};
+use common::{SYS_EXIT, SYS_GETCHAR, SYS_PUTCHAR, SYS_READFILE, SYS_WRITEFILE};
 use core::{arch::asm, panic::PanicInfo};
 
 extern "C" {
@@ -68,6 +68,17 @@ pub fn readfile(filename: &str, buf: &mut [u8], len: u32) -> u32 {
             SYS_READFILE,
             filename as *const _ as *const u8 as u32,
             buf.as_ptr() as *mut u8 as u32,
+            len,
+        )
+    }
+}
+
+pub fn writefile(filename: &str, buf: &[u8], len: u32) -> u32 {
+    unsafe {
+        syscall(
+            SYS_WRITEFILE,
+            filename as *const _ as *const u8 as u32,
+            buf.as_ptr() as *const u8 as u32,
             len,
         )
     }
