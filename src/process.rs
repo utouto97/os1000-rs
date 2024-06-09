@@ -10,7 +10,9 @@ extern "C" {
 }
 
 const PROCS_MAX: usize = 8;
-const SSTATUS_SPIE: usize = 1 << 5;
+const SSTATUS_SPIE: u32 = 1 << 5;
+const SSTATUS_SUM: u32 = 1 << 18;
+const SSTATUS: u32 = SSTATUS_SPIE | SSTATUS_SUM;
 const USER_BASE: usize = 0x01000000;
 
 #[naked]
@@ -23,7 +25,7 @@ extern "C" fn user_entry() {
             "csrw sstatus, a0",
             "sret",
             sepc = const USER_BASE,
-            sstatus = const SSTATUS_SPIE,
+            sstatus = const SSTATUS,
             options(noreturn)
         );
     }

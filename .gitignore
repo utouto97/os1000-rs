@@ -7,3 +7,5 @@ shell.bin
 shell.bin.o
 
 lorem.txt
+disk/
+disk.tar

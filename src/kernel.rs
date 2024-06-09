@@ -3,17 +3,24 @@
 #![feature(naked_functions)]
 #![feature(asm_const)]
 
+mod fs;
 mod memory;
 mod process;
 mod sbi;
 mod virtio;
 
-use common::{println, read_csr, write_csr, TrapFrame, SYS_EXIT, SYS_GETCHAR, SYS_PUTCHAR};
+use common::{
+    ascii_len, println, read_csr, write_csr, TrapFrame, SYS_EXIT, SYS_GETCHAR, SYS_PUTCHAR,
+    SYS_READFILE,
+};
 use core::{arch::asm, panic::PanicInfo, ptr};
 use process::ProcessManager;
 use sbi::{getchar, putchar};
 
-use crate::virtio::Virtio;
+use crate::{
+    fs::{fs_init, fs_lookup},
+    virtio::Virtio,
+};
 
 extern "C" {
     static mut __bss: u32;
@@ -37,18 +44,19 @@ fn kernel_main() {
 
     write_csr!("stvec", kernel_entry);
 
-    let mut buf: [u8; Virtio::SECTOR_SIZE as usize] = [0; Virtio::SECTOR_SIZE as usize];
+    // let mut buf: [u8; Virtio::SECTOR_SIZE as usize] = [0; Virtio::SECTOR_SIZE as usize];
     let mut virtio = Virtio::new();
-    virtio.read_write_disk(&mut buf, 0, false);
-    let s = core::str::from_utf8(&buf).unwrap();
-    println!("lorem.txt {:?}", s);
-
-    let mut buf: [u8; Virtio::SECTOR_SIZE as usize] = [0; Virtio::SECTOR_SIZE as usize];
-    let message = "hello from kernel!!!\n";
-    for (i, &byte) in message.as_bytes().iter().enumerate() {
-        buf[i] = byte;
-    }
-    virtio.read_write_disk(&mut buf, 0, true);
+    // virtio.read_write_disk(&mut buf, 0, false);
+    // let s = core::str::from_utf8(&buf).unwrap();
+    // println!("lorem.txt {:?}", s);
+    //
+    // let mut buf: [u8; Virtio::SECTOR_SIZE as usize] = [0; Virtio::SECTOR_SIZE as usize];
+    // let message = "hello from kernel!!!\n";
+    // for (i, &byte) in message.as_bytes().iter().enumerate() {
+    //     buf[i] = byte;
+    // }
+    // virtio.read_write_disk(&mut buf, 0, true);
+    unsafe { fs_init(&mut virtio) };
 
     unsafe {
         let start = ptr::addr_of!(_binary_shell_bin_start);
@@ -195,6 +203,31 @@ fn handle_syscall(f: *mut TrapFrame) {
         },
         SYS_EXIT => {
             unsafe { PM.exit() };
+        }
+        SYS_READFILE => {
+            let filename = f.a0 as *const u8;
+            let filename_len = ascii_len(filename);
+            let filename = unsafe {
+                core::str::from_utf8(core::slice::from_raw_parts(filename, filename_len - 1))
+                    .unwrap()
+            };
+
+            let buf = f.a1 as *const u8;
+            let mut len = f.a2 as usize;
+
+            let file = if let Ok(f) = fs_lookup(filename) {
+                unsafe { f.as_mut().unwrap() }
+            } else {
+                println!("file not found: {}", filename);
+                f.a0 = 0xffff_fffe as u32;
+                return;
+            };
+
+            if len > file.size {
+                len = file.size;
+            }
+
+            unsafe { ptr::copy(file.data.as_ptr(), buf as *mut _, len) };
         }
         _ => panic!("unexpected syscall a3={:x}", f.a3 as u32),
     }

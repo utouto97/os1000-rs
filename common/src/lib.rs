@@ -115,5 +115,33 @@ pub const fn is_aligned(value: usize, align: usize) -> bool {
 pub const SYS_PUTCHAR: u32 = 1;
 pub const SYS_GETCHAR: u32 = 2;
 pub const SYS_EXIT: u32 = 3;
+pub const SYS_READFILE: u32 = 4;
+pub const SYS_WRITEFILE: u32 = 5;
 
 pub const VIRTIO_BLK_PADDR: usize = 0x10001000;
+
+pub fn ascii_len(buf: *const u8) -> usize {
+    let len;
+    let mut i = 0;
+    loop {
+        if unsafe { *buf.add(i as usize) } == b'\0' {
+            len = i + 1;
+            break;
+        }
+        i += 1;
+    }
+    len
+}
+
+pub fn oct2int(oct: *const u8, len: usize) -> usize {
+    let mut dec = 0;
+    for i in 0..len {
+        unsafe {
+            if *oct.add(i) < b'0' || *oct.add(i) > b'7' {
+                break;
+            }
+            dec = dec * 8 + (*oct.add(i) - b'0') as usize;
+        }
+    }
+    dec
+}
